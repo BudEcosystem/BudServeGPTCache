@@ -62,7 +62,7 @@ def get_models(global_key: str, redis_connection: Redis):
             yield cls.validate
 
         @classmethod
-        def validate(cls, v: [np.array, bytes]):
+        def validate(cls, v: [np.array, bytes], extra_arg=None):
             if isinstance(v, np.ndarray):
                 return cls(v.astype(np.float32).tobytes())
             elif isinstance(v, bytes):
@@ -151,7 +151,7 @@ def get_models(global_key: str, redis_connection: Redis):
         similarity: float = Field(index=True)
         cache_delta_time: float = Field(index=True)
         cache_time: datetime.datetime = Field(index=True)
-        extra: Optional[str]
+        extra: Optional[str] = None
 
     return Questions, Answers, QuestionDeps, Sessions, Counter, Report
 
@@ -270,7 +270,7 @@ class RedisCacheStorage(CacheStorage):
             create_on=datetime.datetime.utcnow(),
             last_access=datetime.datetime.utcnow(),
             deleted=0,
-            answers=answers,
+            answers=all_data,
             deps=all_deps,
             embedding=embedding_data
         )

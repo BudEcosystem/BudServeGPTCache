@@ -22,8 +22,8 @@ class EvictionManager:
         mark_count = self._scalar_storage.count(state=-1)
         all_count = self._scalar_storage.count(is_all=True)
         if (
-            mark_count > self.MAX_MARK_COUNT
-            or mark_count / all_count > self.MAX_MARK_RATE
+            mark_count > self.MAX_MARK_COUNT or (all_count and
+            mark_count / all_count > self.MAX_MARK_RATE)
         ):
             return True
         return False

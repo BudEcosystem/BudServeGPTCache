@@ -56,6 +56,7 @@ def adapt(llm_handler, cache_data_convert, update_cache_callback, *args, **kwarg
         chat_cache.pre_embedding_func,
         func_name="pre_process",
         report_func=chat_cache.report.pre,
+        cache_config=chat_cache.config,
     )(
         kwargs,
         extra_param=context.get("pre_embedding_func", None),
@@ -79,12 +80,14 @@ def adapt(llm_handler, cache_data_convert, update_cache_callback, *args, **kwarg
             chat_cache.embedding_func,
             func_name="embedding",
             report_func=chat_cache.report.embedding,
+            cache_config=chat_cache.config,
         )(pre_embedding_data, extra_param=context.get("embedding_func", None))
     if cache_enable and not cache_skip:
         search_data_list = time_cal(
             chat_cache.data_manager.search,
             func_name="search",
             report_func=chat_cache.report.search,
+            cache_config=chat_cache.config,
         )(
             embedding_data,
             extra_param=context.get("search_func", None),
@@ -110,6 +113,7 @@ def adapt(llm_handler, cache_data_convert, update_cache_callback, *args, **kwarg
                 chat_cache.data_manager.get_scalar_data,
                 func_name="get_data",
                 report_func=chat_cache.report.data,
+                cache_config=chat_cache.config,
             )(
                 search_data,
                 extra_param=context.get("get_scalar_data", None),
@@ -159,6 +163,7 @@ def adapt(llm_handler, cache_data_convert, update_cache_callback, *args, **kwarg
                 chat_cache.similarity_evaluation.evaluation,
                 func_name="evaluation",
                 report_func=chat_cache.report.evaluation,
+                cache_config=chat_cache.config,
             )(
                 eval_query_data,
                 eval_cache_data,
@@ -199,6 +204,7 @@ def adapt(llm_handler, cache_data_convert, update_cache_callback, *args, **kwarg
                 post_process,
                 func_name="post_process",
                 report_func=chat_cache.report.post,
+                cache_config=chat_cache.config,
             )()
             chat_cache.report.hint_cache()
             cache_whole_data = answers_dict.get(str(return_message))
@@ -239,7 +245,8 @@ def adapt(llm_handler, cache_data_convert, update_cache_callback, *args, **kwarg
             # cache miss
             return None
         llm_data = time_cal(
-            llm_handler, func_name="llm_request", report_func=chat_cache.report.llm
+            llm_handler, func_name="llm_request", report_func=chat_cache.report.llm,
+            cache_config=chat_cache.config,
         )(*args, **kwargs)
 
     if not llm_data:
@@ -257,6 +264,7 @@ def adapt(llm_handler, cache_data_convert, update_cache_callback, *args, **kwarg
                     chat_cache.data_manager.save,
                     func_name="save",
                     report_func=chat_cache.report.save,
+                    cache_config=chat_cache.config,
                 )(
                     question,
                     handled_llm_data,
@@ -327,6 +335,7 @@ async def aadapt(
         chat_cache.pre_embedding_func,
         func_name="pre_process",
         report_func=chat_cache.report.pre,
+        cache_config=chat_cache.config,
     )(
         kwargs,
         extra_param=context.get("pre_embedding_func", None),
@@ -350,12 +359,14 @@ async def aadapt(
             chat_cache.embedding_func,
             func_name="embedding",
             report_func=chat_cache.report.embedding,
+            cache_config=chat_cache.config,
         )(pre_embedding_data, extra_param=context.get("embedding_func", None))
     if cache_enable and not cache_skip:
         search_data_list = time_cal(
             chat_cache.data_manager.search,
             func_name="search",
             report_func=chat_cache.report.search,
+            cache_config=chat_cache.config,
         )(
             embedding_data,
             extra_param=context.get("search_func", None),
@@ -381,6 +392,7 @@ async def aadapt(
                 chat_cache.data_manager.get_scalar_data,
                 func_name="get_data",
                 report_func=chat_cache.report.data,
+                cache_config=chat_cache.config,
             )(
                 search_data,
                 extra_param=context.get("get_scalar_data", None),
@@ -418,6 +430,7 @@ async def aadapt(
                 chat_cache.similarity_evaluation.evaluation,
                 func_name="evaluation",
                 report_func=chat_cache.report.evaluation,
+                cache_config=chat_cache.config,
             )(
                 eval_query_data,
                 eval_cache_data,
@@ -454,6 +467,7 @@ async def aadapt(
                 post_process,
                 func_name="post_process",
                 report_func=chat_cache.report.post,
+                cache_config=chat_cache.config,
             )()
             chat_cache.report.hint_cache()
             cache_whole_data = answers_dict.get(str(return_message))
@@ -503,6 +517,7 @@ async def aadapt(
                     chat_cache.data_manager.save,
                     func_name="save",
                     report_func=chat_cache.report.save,
+                    cache_config=chat_cache.config,
                 )(
                     question,
                     handled_llm_data,

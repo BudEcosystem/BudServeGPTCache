@@ -20,6 +20,10 @@ def adapt(llm_handler, cache_data_convert, update_cache_callback, *args, **kwarg
     :return: llm result
     """
     start_time = time.time()
+    cache_config = kwargs.pop("cache_config", {})
+    metric_enabled = cache_config.get("enable_metrics")
+    metric_request_id = cache_config.get("metric_request_id")
+    metric_update_func = cache_config.get("metric_update_func")
     search_only_flag = kwargs.pop("search_only", False)
     user_temperature = "temperature" in kwargs
     user_top_k = "top_k" in kwargs
@@ -51,8 +55,13 @@ def adapt(llm_handler, cache_data_convert, update_cache_callback, *args, **kwarg
         cache_skip = kwargs.pop("cache_skip", True)
     else:  # temperature <= 0
         cache_skip = kwargs.pop("cache_skip", False)
+
+    cache_metric = {"request_id": metric_request_id, "api_type": "get"}
+    if cache_skip:
+        cache_metric["api_type"] = "put"
+
     cache_factor = kwargs.pop("cache_factor", 1.0)
-    pre_embedding_res = time_cal(
+    pre_embedding_res, delta_time = time_cal(
         chat_cache.pre_embedding_func,
         func_name="pre_process",
         report_func=chat_cache.report.pre,
@@ -76,14 +85,15 @@ def adapt(llm_handler, cache_data_convert, update_cache_callback, *args, **kwarg
         )
 
     if cache_enable:
-        embedding_data = time_cal(
+        embedding_data, delta_time = time_cal(
             chat_cache.embedding_func,
             func_name="embedding",
             report_func=chat_cache.report.embedding,
             cache_config=chat_cache.config,
         )(pre_embedding_data, extra_param=context.get("embedding_func", None))
+        cache_metric["embedding"] = delta_time
     if cache_enable and not cache_skip:
-        search_data_list = time_cal(
+        search_data_list, delta_time = time_cal(
             chat_cache.data_manager.search,
             func_name="search",
             report_func=chat_cache.report.search,
@@ -95,6 +105,7 @@ def adapt(llm_handler, cache_data_convert, update_cache_callback, *args, **kwarg
             if (user_temperature and not user_top_k)
             else kwargs.pop("top_k", -1),
         )
+        cache_metric["search"] = delta_time
         if search_data_list is None:
             search_data_list = []
         cache_answers = []
@@ -109,7 +120,7 @@ def adapt(llm_handler, cache_data_convert, update_cache_callback, *args, **kwarg
             else rank_threshold
         )
         for search_data in search_data_list:
-            cache_data = time_cal(
+            cache_data, delta_time = time_cal(
                 chat_cache.data_manager.get_scalar_data,
                 func_name="get_data",
                 report_func=chat_cache.report.data,
@@ -119,6 +130,7 @@ def adapt(llm_handler, cache_data_convert, update_cache_callback, *args, **kwarg
                 extra_param=context.get("get_scalar_data", None),
                 session=session,
             )
+            cache_metric["get_data"] = delta_time
             if cache_data is None:
                 continue
 
@@ -159,7 +171,7 @@ def adapt(llm_handler, cache_data_convert, update_cache_callback, *args, **kwarg
                     "cache_data": cache_data,
                     "embedding": cache_data.embedding_data,
                 }
-            rank = time_cal(
+            rank, delta_time = time_cal(
                 chat_cache.similarity_evaluation.evaluation,
                 func_name="evaluation",
                 report_func=chat_cache.report.evaluation,
@@ -169,6 +181,7 @@ def adapt(llm_handler, cache_data_convert, update_cache_callback, *args, **kwarg
                 eval_cache_data,
                 extra_param=context.get("evaluation_func", None),
             )
+            cache_metric["evaluation"] = delta_time
             gptcache_log.debug(
                 "similarity: [user question] %s, [cache question] %s, [value] %f",
                 pre_store_data,
@@ -200,7 +213,7 @@ def adapt(llm_handler, cache_data_convert, update_cache_callback, *args, **kwarg
                     )
                 return return_message
 
-            return_message = time_cal(
+            return_message, delta_time = time_cal(
                 post_process,
                 func_name="post_process",
                 report_func=chat_cache.report.post,
@@ -228,6 +241,8 @@ def adapt(llm_handler, cache_data_convert, update_cache_callback, *args, **kwarg
                     cache_whole_data[0],
                     round(time.time() - start_time, 6),
                 )
+                if metric_enabled and metric_request_id and metric_update_func:
+                    metric_update_func(cache_metric)
             return cache_data_convert(return_message)
 
     next_cache = chat_cache.next_cache
@@ -244,7 +259,7 @@ def adapt(llm_handler, cache_data_convert, update_cache_callback, *args, **kwarg
         if search_only_flag:
             # cache miss
             return None
-        llm_data = time_cal(
+        llm_data, delta_time = time_cal(
             llm_handler, func_name="llm_request", report_func=chat_cache.report.llm,
             cache_config=chat_cache.config,
         )(*args, **kwargs)
@@ -260,7 +275,7 @@ def adapt(llm_handler, cache_data_convert, update_cache_callback, *args, **kwarg
                     question = pre_store_data
                 else:
                     question.content = pre_store_data
-                time_cal(
+                _, delta_time = time_cal(
                     chat_cache.data_manager.save,
                     func_name="save",
                     report_func=chat_cache.report.save,
@@ -272,18 +287,20 @@ def adapt(llm_handler, cache_data_convert, update_cache_callback, *args, **kwarg
                     extra_param=context.get("save_func", None),
                     session=session,
                 )
+                cache_metric["save"] = delta_time
                 if (
                     chat_cache.report.op_save.count > 0
                     and chat_cache.report.op_save.count % chat_cache.config.auto_flush
                     == 0
                 ):
-                    time_cal(
+                    _, delta_time = time_cal(
                         chat_cache.flush,
                         func_name="index_flush",
                         report_func=None,
                         cache_config=chat_cache.config,
                     )()
                     # chat_cache.flush()
+                    cache_metric["index_flush"] = delta_time
 
             llm_data = update_cache_callback(
                 llm_data, update_cache_func, *args, **kwargs
@@ -337,7 +354,7 @@ async def aadapt(
     else:  # temperature <= 0
         cache_skip = kwargs.pop("cache_skip", False)
     cache_factor = kwargs.pop("cache_factor", 1.0)
-    pre_embedding_res = time_cal(
+    pre_embedding_res, delta_time = time_cal(
         chat_cache.pre_embedding_func,
         func_name="pre_process",
         report_func=chat_cache.report.pre,
@@ -361,14 +378,14 @@ async def aadapt(
         )
 
     if cache_enable:
-        embedding_data = time_cal(
+        embedding_data, delta_time = time_cal(
             chat_cache.embedding_func,
             func_name="embedding",
             report_func=chat_cache.report.embedding,
             cache_config=chat_cache.config,
         )(pre_embedding_data, extra_param=context.get("embedding_func", None))
     if cache_enable and not cache_skip:
-        search_data_list = time_cal(
+        search_data_list, delta_time = time_cal(
             chat_cache.data_manager.search,
             func_name="search",
             report_func=chat_cache.report.search,
@@ -394,7 +411,7 @@ async def aadapt(
             else rank_threshold
         )
         for search_data in search_data_list:
-            cache_data = time_cal(
+            cache_data, delta_time = time_cal(
                 chat_cache.data_manager.get_scalar_data,
                 func_name="get_data",
                 report_func=chat_cache.report.data,
@@ -432,7 +449,7 @@ async def aadapt(
                     "cache_data": cache_data,
                     "embedding": cache_data.embedding_data,
                 }
-            rank = time_cal(
+            rank, delta_time = time_cal(
                 chat_cache.similarity_evaluation.evaluation,
                 func_name="evaluation",
                 report_func=chat_cache.report.evaluation,
@@ -469,7 +486,7 @@ async def aadapt(
                     )
                 return return_message
 
-            return_message = time_cal(
+            return_message, delta_time = time_cal(
                 post_process,
                 func_name="post_process",
                 report_func=chat_cache.report.post,

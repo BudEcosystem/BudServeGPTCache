@@ -16,6 +16,6 @@ def time_cal(func, func_name=None, report_func=None, cache_config=None):
             )
         if report_func is not None:
             report_func(delta_time)
-        return res
+        return res, delta_time
 
     return inner

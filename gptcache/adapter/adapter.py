@@ -20,10 +20,17 @@ def adapt(llm_handler, cache_data_convert, update_cache_callback, *args, **kwarg
     :return: llm result
     """
     start_time = time.time()
+
     cache_config = kwargs.pop("cache_config", {})
     metric_enabled = cache_config.get("enable_metrics")
     metric_request_id = cache_config.get("metric_request_id")
     metric_update_func = cache_config.get("metric_update_func")
+    endpoint_id = cache_config.get("endpoint_id")
+    project_id = cache_config.get("project_id")
+    model_id = cache_config.get("model_id")
+    api_endpoint = cache_config.get("api_endpoint")
+    engine = cache_config.get("engine")
+
     search_only_flag = kwargs.pop("search_only", False)
     user_temperature = "temperature" in kwargs
     user_top_k = "top_k" in kwargs
@@ -56,7 +63,15 @@ def adapt(llm_handler, cache_data_convert, update_cache_callback, *args, **kwarg
     else:  # temperature <= 0
         cache_skip = kwargs.pop("cache_skip", False)
 
-    cache_metric = {"request_id": metric_request_id, "api_type": "get"}
+    cache_metric = {
+        "request_id": metric_request_id,
+        "api_type": "get",
+        "project_id": project_id,
+        "endpoint_id": endpoint_id,
+        "model_id": model_id,
+        "engine": engine,
+        "api_endpoint": api_endpoint,
+    }
     if cache_skip:
         cache_metric["api_type"] = "put"
 
@@ -305,6 +320,8 @@ def adapt(llm_handler, cache_data_convert, update_cache_callback, *args, **kwarg
             llm_data = update_cache_callback(
                 llm_data, update_cache_func, *args, **kwargs
             )
+            if metric_enabled and metric_request_id and metric_update_func:
+                metric_update_func(cache_metric)
         except Exception as e:  # pylint: disable=W0703
             gptcache_log.warning("failed to save the data to cache, error: %s", e)
     return llm_data

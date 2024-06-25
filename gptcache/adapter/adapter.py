@@ -277,7 +277,13 @@ def adapt(llm_handler, cache_data_convert, update_cache_callback, *args, **kwarg
                     and chat_cache.report.op_save.count % chat_cache.config.auto_flush
                     == 0
                 ):
-                    chat_cache.flush()
+                    time_cal(
+                        chat_cache.flush,
+                        func_name="index_flush",
+                        report_func=None,
+                        cache_config=chat_cache.config,
+                    )()
+                    # chat_cache.flush()
 
             llm_data = update_cache_callback(
                 llm_data, update_cache_func, *args, **kwargs
@@ -530,7 +536,13 @@ async def aadapt(
                     and chat_cache.report.op_save.count % chat_cache.config.auto_flush
                     == 0
                 ):
-                    chat_cache.flush()
+                    time_cal(
+                        chat_cache.flush,
+                        func_name="index_flush",
+                        report_func=None,
+                        cache_config=chat_cache.config,
+                    )()
+                    # chat_cache.flush()
             llm_data = update_cache_callback(
                 llm_data, update_cache_func, *args, **kwargs
             )

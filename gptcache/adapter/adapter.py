@@ -23,6 +23,10 @@ def adapt(llm_handler, cache_data_convert, update_cache_callback, *args, **kwarg
 
     cache_config = kwargs.pop("cache_config", {})
     metric_enabled = cache_config.get("enable_metrics")
+    metric_start_time = cache_config.get("request_start_time")
+    gptcache_log.debug("metric start time: %s", metric_start_time)
+    gptcache_log.debug("cache start time: %s", start_time)
+
     metric_request_id = cache_config.get("metric_request_id")
     metric_update_func = cache_config.get("metric_update_func")
     endpoint_id = cache_config.get("endpoint_id")
@@ -64,6 +68,7 @@ def adapt(llm_handler, cache_data_convert, update_cache_callback, *args, **kwarg
         cache_skip = kwargs.pop("cache_skip", False)
 
     cache_metric = {
+        "use_cache": True,
         "request_id": metric_request_id,
         "api_type": "get",
         "project_id": project_id,
@@ -256,8 +261,9 @@ def adapt(llm_handler, cache_data_convert, update_cache_callback, *args, **kwarg
                     cache_whole_data[0],
                     round(time.time() - start_time, 6),
                 )
-                if metric_enabled and metric_request_id and metric_update_func:
-                    metric_update_func(cache_metric)
+            if metric_enabled and metric_request_id and metric_update_func:
+                cache_metric["latency"] = time.time() - metric_start_time
+                metric_update_func(cache_metric)
             return cache_data_convert(return_message)
 
     next_cache = chat_cache.next_cache
@@ -320,10 +326,11 @@ def adapt(llm_handler, cache_data_convert, update_cache_callback, *args, **kwarg
             llm_data = update_cache_callback(
                 llm_data, update_cache_func, *args, **kwargs
             )
-            if metric_enabled and metric_request_id and metric_update_func:
-                metric_update_func(cache_metric)
         except Exception as e:  # pylint: disable=W0703
             gptcache_log.warning("failed to save the data to cache, error: %s", e)
+    if metric_enabled and metric_request_id and metric_update_func:
+        cache_metric["latency"] = time.time() - metric_start_time
+        metric_update_func(cache_metric)
     return llm_data
 
 

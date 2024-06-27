@@ -21,19 +21,16 @@ def adapt(llm_handler, cache_data_convert, update_cache_callback, *args, **kwarg
     """
     start_time = time.time()
 
-    cache_config = kwargs.pop("cache_config", {})
-    metric_enabled = cache_config.get("enable_metrics")
-    metric_start_time = cache_config.get("request_start_time")
-    gptcache_log.debug("metric start time: %s", metric_start_time)
-    gptcache_log.debug("cache start time: %s", start_time)
-
-    metric_request_id = cache_config.get("metric_request_id")
-    metric_update_func = cache_config.get("metric_update_func")
-    endpoint_id = cache_config.get("endpoint_id")
-    project_id = cache_config.get("project_id")
-    model_id = cache_config.get("model_id")
-    api_endpoint = cache_config.get("api_endpoint")
-    engine = cache_config.get("engine")
+    cache_metric_config = kwargs.pop("cache_metric_config", {})
+    metric_enabled = cache_metric_config.get("enable_metrics")
+    metric_start_time = cache_metric_config.get("request_start_time")
+    metric_request_id = cache_metric_config.get("metric_request_id")
+    metric_update_func = cache_metric_config.get("metric_update_func")
+    endpoint_id = cache_metric_config.get("endpoint_id")
+    project_id = cache_metric_config.get("project_id")
+    model_id = cache_metric_config.get("model_id")
+    api_endpoint = cache_metric_config.get("api_endpoint")
+    engine = cache_metric_config.get("engine")
 
     search_only_flag = kwargs.pop("search_only", False)
     user_temperature = "temperature" in kwargs

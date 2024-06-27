@@ -99,6 +99,7 @@ class RedisVectorStore(VectorBase):
             )
 
     def mul_add(self, datas: List[VectorData]):
+        self._create_collection(self.collection_name)
         pipe = self._client.pipeline()
 
         for data in datas:
@@ -111,6 +112,7 @@ class RedisVectorStore(VectorBase):
         pipe.execute()
 
     def search(self, data: np.ndarray, top_k: int = -1):
+        self._create_collection(self.collection_name)
         query = (
             Query(
                 f"*=>[KNN {top_k if top_k > 0 else self.top_k} @vector $vec as score]"

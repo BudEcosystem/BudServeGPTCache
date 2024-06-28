@@ -22,10 +22,8 @@ def adapt(llm_handler, cache_data_convert, update_cache_callback, *args, **kwarg
     start_time = time.time()
 
     cache_metric_config = kwargs.pop("cache_metric_config", {})
-    metric_enabled = cache_metric_config.get("enable_metrics")
     metric_start_time = cache_metric_config.get("request_start_time")
     metric_request_id = cache_metric_config.get("metric_request_id")
-    metric_update_func = cache_metric_config.get("metric_update_func")
     endpoint_id = cache_metric_config.get("endpoint_id")
     project_id = cache_metric_config.get("project_id")
     model_id = cache_metric_config.get("model_id")
@@ -218,19 +216,21 @@ def adapt(llm_handler, cache_data_convert, update_cache_callback, *args, **kwarg
                 factor = max_rank - min_rank
                 hit_callback([(d[3].question, d[0] / factor if factor else d[0]) for d in cache_answers])
             def post_process():
+                messages = [t[1] for t in cache_answers]
+                scores = [t[0] for t in cache_answers]
                 if chat_cache.post_process_messages_func is temperature_softmax:
-                    return_message = chat_cache.post_process_messages_func(
-                        messages=[t[1] for t in cache_answers],
-                        scores=[t[0] for t in cache_answers],
+                    return_message, score = chat_cache.post_process_messages_func(
+                        messages=messages,
+                        scores=scores,
                         temperature=temperature,
                     )
                 else:
-                    return_message = chat_cache.post_process_messages_func(
-                        [t[1] for t in cache_answers]
+                    return_message, score = chat_cache.post_process_messages_func(
+                        messages, scores
                     )
-                return return_message
+                return return_message, score
 
-            return_message, delta_time = time_cal(
+            (return_message, score), delta_time = time_cal(
                 post_process,
                 func_name="post_process",
                 report_func=chat_cache.report.post,
@@ -258,10 +258,9 @@ def adapt(llm_handler, cache_data_convert, update_cache_callback, *args, **kwarg
                     cache_whole_data[0],
                     round(time.time() - start_time, 6),
                 )
-            if metric_enabled and metric_request_id and metric_update_func:
-                cache_metric["latency"] = time.time() - metric_start_time
-                metric_update_func(cache_metric)
-            return cache_data_convert(return_message)
+            cache_metric["score"] = score
+            cache_metric["latency"] = time.time() - metric_start_time
+            return cache_data_convert(return_message), cache_metric
 
     next_cache = chat_cache.next_cache
     if next_cache:
@@ -276,14 +275,16 @@ def adapt(llm_handler, cache_data_convert, update_cache_callback, *args, **kwarg
     else:
         if search_only_flag:
             # cache miss
-            return None
+            cache_metric["latency"] = time.time() - metric_start_time
+            return None, cache_metric
         llm_data, delta_time = time_cal(
             llm_handler, func_name="llm_request", report_func=chat_cache.report.llm,
             cache_config=chat_cache.config,
         )(*args, **kwargs)
 
     if not llm_data:
-        return None
+        cache_metric["latency"] = time.time() - metric_start_time
+        return None, cache_metric
 
     if cache_enable:
         try:
@@ -325,10 +326,8 @@ def adapt(llm_handler, cache_data_convert, update_cache_callback, *args, **kwarg
             )
         except Exception as e:  # pylint: disable=W0703
             gptcache_log.warning("failed to save the data to cache, error: %s", e)
-    if metric_enabled and metric_request_id and metric_update_func:
-        cache_metric["latency"] = time.time() - metric_start_time
-        metric_update_func(cache_metric)
-    return llm_data
+    cache_metric["latency"] = time.time() - metric_start_time
+    return llm_data, cache_metric
 
 
 async def aadapt(

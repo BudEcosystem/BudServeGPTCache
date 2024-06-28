@@ -6,7 +6,7 @@ import numpy
 from gptcache.utils import softmax
 
 
-def random_one(messages: List[Any]) -> Any:
+def random_one(messages: List[Any], scores: List[float]) -> Any:
     """Randomly select one result after evaluation.
 
     :param messages: A list of candidate outputs.
@@ -18,12 +18,15 @@ def random_one(messages: List[Any]) -> Any:
             from gptcache.processor.post import random_one
 
             messages = ["message 1", "message 2", "message 3"]
-            answer = random_one(messages)
+            scores = [0.9, 0.5, 0.1]
+            answer, score = random_one(messages, scores)
     """
-    return random.choice(messages)
+    m_s = list(zip(messages, scores))
+    selected_index = random.choice(range(len(messages)))
+    return m_s[selected_index]
 
 
-def first(messages: List[Any]) -> Any:
+def first(messages: List[Any], scores: List[float]) -> Any:
     """Get the first result after evaluation.
 
     :param messages: A list of candidate outputs.
@@ -35,17 +38,21 @@ def first(messages: List[Any]) -> Any:
             from gptcache.processor.post import first
 
             messages = ["message 1", "message 2", "message 3"]
-            answer = first(messages)
-            assert answer = messages[0]
+            scores = [0.9, 0.5, 0.1]
+            answer = first(messages, scores)
+            assert answer = (messages[0], scores[0])
     """
-    return messages[0]
+    m_s = list(zip(messages, scores))
+    return m_s[0]
 
 
-def nop(messages: List[Any]) -> Any:
+def nop(messages: List[Any], scores: List[float]) -> Any:
     """No change after evaluation.
 
     :param messages: A list of candidate outputs.
     :type messages: List[Any]
+    :param scores: A list of evaluation scores corresponding to `messages`
+    :type scores: List[float]
 
     Example:
         .. code-block:: python
@@ -53,10 +60,12 @@ def nop(messages: List[Any]) -> Any:
             from gptcache.processor.post import nop
 
             messages = ["message 1", "message 2", "message 3"]
-            answer = nop(messages)
-            assert answer = messages
+            scores = [0.9, 0.5, 0.1]
+            answer_scores = nop(messages, scores)
+            assert answer_scores[0] = (messages[0], scores[0])
     """
-    return messages
+    m_s = list(zip(messages, scores))
+    return m_s
 
 
 def temperature_softmax(messages: List[Any], scores: List[float], temperature: float = 0.0) -> Any:
@@ -80,10 +89,12 @@ def temperature_softmax(messages: List[Any], scores: List[float], temperature: f
             scores = [0.9, 0.5, 0.1]
             answer = temperature_softmax(messages, scores, temperature=0.5)
     """
-
+    m_s = list(zip(messages, scores))
     if temperature > 0:
         scores = softmax([x / temperature for x in scores])
-        return numpy.random.choice(messages, size=1, p=scores)[0]
+        index_of_selected_message = numpy.random.choice(
+            range(len(messages)), size=1, p=scores
+        )[0]
+        return m_s[index_of_selected_message][0]
     else:
-        m_s = list(zip(messages, scores))
-        return sorted(m_s, key=lambda x: x[1], reverse=True)[0][0]
+        return sorted(m_s, key=lambda x: x[1], reverse=True)[0]

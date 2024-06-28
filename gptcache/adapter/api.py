@@ -92,7 +92,7 @@ def put(prompt: str, data: Any, **kwargs) -> None:
     def llm_handle(*llm_args, **llm_kwargs):  # pylint: disable=W0613
         return data
 
-    adapt(
+    _, cache_metric = adapt(
         llm_handle,
         _cache_data_converter,
         _update_cache_callback,
@@ -100,6 +100,7 @@ def put(prompt: str, data: Any, **kwargs) -> None:
         prompt=prompt,
         **kwargs,
     )
+    return cache_metric
 
 
 def get(prompt: str, **kwargs) -> Any:
@@ -121,14 +122,14 @@ def get(prompt: str, **kwargs) -> Any:
             put("hello", "foo")
             print(get("hello"))
     """
-    res = adapt(
+    res, cache_metric = adapt(
         _llm_handle_none,
         _cache_data_converter,
         _update_cache_callback_none,
         prompt=prompt,
         **kwargs,
     )
-    return res
+    return res, cache_metric
 
 
 def init_similar_cache(
